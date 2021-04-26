@@ -1,7 +1,7 @@
 # импортируем библиотеки
 from flask import Flask, request
 import logging
-import os
+
 import json
 
 app = Flask(__name__)
@@ -16,11 +16,6 @@ def get_next_item(user_id):
     n = items.index(sessionStorage[user_id]['item'])
     if n != -1:
         return items[n + 1]
-
-
-@app.route('/')
-def hello():
-    return "Hello, world!"
 
 
 @app.route('/post', methods=['POST'])
@@ -74,7 +69,6 @@ def handle_dialog(req, res):
             res['response'][
                 'text'] = f'{sessionStorage[user_id]["item"].capitalize()}' \
                           f' можно найти на Яндекс.Маркете!'
-            res['response']['end_session'] = True
         return res
 
     res['response']['text'] = \
@@ -109,6 +103,4 @@ def get_suggests(user_id):
 
 
 if __name__ == '__main__':
-    # app.run()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run()
