@@ -79,6 +79,7 @@ def handle_dialog(req, res):
     res['response']['text'] = \
         f"Все говорят '{req['request']['original_utterance']}', а ты купи {sessionStorage[user_id]['item']}!"
     res['response']['buttons'] = get_suggests(user_id)
+    res['response']['end_session'] = True
 
 
 # Функция возвращает две подсказки для ответа.
