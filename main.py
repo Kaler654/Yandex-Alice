@@ -1,26 +1,30 @@
-# импортируем библиотеки
+# импортируем библиотек
 from flask import Flask, request
 import logging
 import os
+
 import json
 
 app = Flask(__name__)
 
+# Устанавливаем уровень логирования
 logging.basicConfig(level=logging.INFO)
+
 sessionStorage = {}
 
-items = ['слона', 'кролика', 'утку']
+animals = [('слон', 'слона'), ('кролик', 'кролика')]
+suggests = [
+    "Не хочу.",
+    "Не буду.",
+    "Отстань!"]
 
 
-def get_next_item(user_id):
-    n = items.index(sessionStorage[user_id]['item'])
-    if n != -1:
-        return items[n + 1]
-
-
+# Если понадобится, то вот моё приложение на хероку для теста
+# https://test-alice-yl.herokuapp.com/post
 @app.route('/post', methods=['POST'])
 def main():
     logging.info(f'Request: {request.json!r}')
+
     response = {
         'session': request.json['session'],
         'version': request.json['version'],
@@ -32,6 +36,8 @@ def main():
     handle_dialog(request.json, response)
 
     logging.info(f'Response:  {response!r}')
+
+    # Преобразовываем в JSON и возвращаем
     return json.dumps(response)
 
 
@@ -40,39 +46,39 @@ def handle_dialog(req, res):
 
     if req['session']['new']:
         sessionStorage[user_id] = {
-            'suggests': [
-                "Не хочу.",
-                "Не буду.",
-                "Отстань!"
-            ],
-            'item': 'слона'
-        }
-        res['response']['text'] = f'Привет! Купи {sessionStorage[user_id]["item"]}!'
+            'suggests': suggests[:]}
+
+        animal = sessionStorage[user_id]['animal'] = animals[0]
+        res['response']['text'] = f'Привет! Купи {animal[1]}!'
+        # Получим подсказки
         res['response']['buttons'] = get_suggests(user_id)
         return
 
+    animal = sessionStorage[user_id].get('animal', animals[0])
     if req['request']['original_utterance'].lower() in [
         'ладно',
         'куплю',
         'покупаю',
-        'хорошо',
-        'я куплю',
-        'я покупаю'
+        'хорошо'
     ]:
-        item = get_next_item(user_id)
-        if item is not None:
-            sessionStorage[user_id]['item'] = item
-            res['response'][
-                'text'] = f'{sessionStorage[user_id]["item"].capitalize()}' \
-                          f' можно найти на Яндекс.Маркете! Не хотите ли купить {sessionStorage[user_id]["item"]}?'
-        else:
-            res['response'][
-                'text'] = f'{sessionStorage[user_id]["item"].capitalize()}' \
-                          f' можно найти на Яндекс.Маркете!'
-        return res
+        # Пользователь согласился, прощаемся.
+        msg = f'{animal[1].capitalize()} можно найти на Яндекс.Маркете!'
 
+        if animal == animals[0]:
+            animal = sessionStorage[user_id]['animal'] = animals[1]
+            msg += f' А теперь купите {animal[1]}!'
+            sessionStorage[user_id]['suggests'] = suggests[:]
+            res['response']['buttons'] = get_suggests(user_id)
+
+        elif animal == animals[1]:
+            res['response']['end_session'] = True
+
+        res['response']['text'] = msg
+        return
+
+    # Если нет, то убеждаем его купить слона!
     res['response']['text'] = \
-        f"Все говорят '{req['request']['original_utterance']}', а ты купи {sessionStorage[user_id]['item']}!"
+        f"Все говорят '{req['request']['original_utterance']}', а ты купи {animal[1]}!"
     res['response']['buttons'] = get_suggests(user_id)
 
 
@@ -95,7 +101,7 @@ def get_suggests(user_id):
     if len(suggests) < 2:
         suggests.append({
             "title": "Ладно",
-            "url": "https://market.yandex.ru/search?text=слон",
+            "url": f"https://market.yandex.ru/search?text={sessionStorage[user_id]['animal'][0]}",
             "hide": True
         })
 
@@ -103,6 +109,5 @@ def get_suggests(user_id):
 
 
 if __name__ == '__main__':
-    # app.run()
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
