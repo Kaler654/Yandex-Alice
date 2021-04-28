@@ -1,8 +1,9 @@
-from flask import Flask, request
-import logging
 import json
-import random
+import logging
 import os
+import random
+
+from flask import Flask, request
 
 app = Flask(__name__)
 
@@ -25,13 +26,20 @@ sessionStorage = {}
 @app.route('/post', methods=['POST'])
 def main():
     logging.info('Request: %r', request.json)
-    response = {
+
+    response = {  # В самом начале добавляем кнопку о помощи
         'session': request.json['session'],
         'version': request.json['version'],
         'response': {
-            'end_session': False
+            'end_session': False,
+            'buttons':  [{
+                'title': 'Помощь',
+                'hide': True
+            }]
         }
+
     }
+
     handle_dialog(response, request.json)
     logging.info('Response: %r', response)
     return json.dumps(response)
@@ -39,13 +47,24 @@ def main():
 
 def handle_dialog(res, req):
     user_id = req['session']['user_id']
+
     if req['session']['new']:
         res['response']['text'] = 'Привет! Назови своё имя!'
         sessionStorage[user_id] = {
             'first_name': None,  # здесь будет храниться имя
-            'game_started': False  # здесь информация о том, что
+            'game_started': False,  # здесь информация о том, что
+            'last_btns': [{
+                        'title': 'Помощь',
+                        'hide': True
+                    }]
             # пользователь начал игру. По умолчанию False
         }
+        return
+
+    if req['request']['original_utterance'].lower() in ['помощь', 'помоги', 'help', 'помогите']:
+        res['response']['text'] = 'Активировалась помощь! Не знаю, что здесь написать :D\n' \
+                                  'Продолжайте отвечать на заданный ранее вопрос!!!'
+        res['response']['buttons'] = sessionStorage[user_id].get('last_btns', [])[:]
         return
 
     if sessionStorage[user_id]['first_name'] is None:
@@ -70,6 +89,9 @@ def handle_dialog(res, req):
                 {
                     'title': 'Нет',
                     'hide': True
+                }, {
+                    'title': 'Помощь',
+                    'hide': True
                 }
             ]
     else:
@@ -93,6 +115,7 @@ def handle_dialog(res, req):
                     sessionStorage[user_id]['attempt'] = 1
                     # функция, которая выбирает город для игры и показывает фото
                     play_game(res, req)
+
             elif 'нет' in req['request']['nlu']['tokens']:
                 res['response']['text'] = 'Ну и ладно!'
                 res['response']['end_session'] = True
@@ -106,10 +129,15 @@ def handle_dialog(res, req):
                     {
                         'title': 'Нет',
                         'hide': True
+                    }, {
+                        'title': 'Помощь',
+                        'hide': True
                     }
                 ]
+
         else:
             play_game(res, req)
+    sessionStorage[user_id]['last_btns'] = res['response'].get('buttons', [])[:]
 
 
 def play_game(res, req):
