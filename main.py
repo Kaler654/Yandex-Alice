@@ -53,9 +53,8 @@ def get_geo_info(city_name, type_info='coordinates'):
 
 app = Flask(__name__)
 
-
-logging.basicConfig(level=logging.INFO, filename='app.log',
-                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
+# logging.basicConfig(level=logging.INFO, filename='app.log',
+#                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
 
 
 # Все фото загружал я лично через Postman
@@ -70,18 +69,18 @@ cities = {
 
 sessionStorage = {}
 STANDART_BTNS = [
-                {
-                    'title': 'Да',
-                    'hide': True
-                },
-                {
-                    'title': 'Нет',
-                    'hide': True
-                }, {
-                    'title': 'Помощь',
-                    'hide': True
-                }
-            ]
+    {
+        'title': 'Да',
+        'hide': True
+    },
+    {
+        'title': 'Нет',
+        'hide': True
+    }, {
+        'title': 'Помощь',
+        'hide': True
+    }
+]
 
 
 @app.route('/post', methods=['POST'])
@@ -93,7 +92,7 @@ def main():
         'version': request.json['version'],
         'response': {
             'end_session': False,
-            'buttons':  [{
+            'buttons': [{
                 'title': 'Помощь',
                 'hide': True
             }]
@@ -115,9 +114,9 @@ def handle_dialog(res, req):
             'first_name': None,  # здесь будет храниться имя
             'game_started': False,  # здесь информация о том, что
             'last_btns': [{
-                        'title': 'Помощь',
-                        'hide': True
-                    }]
+                'title': 'Помощь',
+                'hide': True
+            }]
             # пользователь начал игру. По умолчанию False
         }
         return
@@ -134,7 +133,6 @@ def handle_dialog(res, req):
             res['response']['text'] = 'Не расслышала имя. Повтори, пожалуйста!'
         else:
             sessionStorage[user_id]['first_name'] = first_name
-
             sessionStorage[user_id]['guessed_cities'] = []
 
             res['response']['text'] = f'Приятно познакомиться, {first_name.title()}.' \
@@ -177,12 +175,11 @@ def play_game(res, req):
     if attempt == 1:
         # если попытка первая, то случайным образом выбираем город для гадания
         city = random.choice(list(cities))
-        # выбираем его до тех пор пока не выбираем город, которого
-        # нет в sessionStorage[user_id]['guessed_cities']
         while city in sessionStorage[user_id]['guessed_cities']:
             city = random.choice(list(cities))
         # записываем город в информацию о пользователе
         sessionStorage[user_id]['city'] = city
+        sessionStorage[user_id]['country'] = get_geo_info(city, type_info='country').lower()
         # добавляем в ответ картинку
         res['response']['card'] = {}
         res['response']['card']['type'] = 'BigImage'
@@ -192,25 +189,30 @@ def play_game(res, req):
     else:
         # сюда попадаем, если попытка отгадать не первая
         city = sessionStorage[user_id]['city']
-        # проверяем есть ли правильный ответ в сообщение
+
+        if city in sessionStorage[user_id]['guessed_cities']:
+            if req['request']['original_utterance'].lower() == \
+                    sessionStorage[user_id]['country']:
+                res['response']['buttons'] = [*STANDART_BTNS,
+                                              {'title': 'Покажи город на карте',
+                                               'hide': True,
+                                               "url": f"https://yandex.ru/maps/"
+                                                      f"?mode=search&text={city}"}]
+                res['response']['text'] = 'Правильно! Сыграем ещё?'
+
+                sessionStorage[user_id]['game_started'] = False
+                return
+            res['response']['text'] = 'Вы не угадали страну города! Попробуйте ещё раз.'
+            return
+
+            # проверяем есть ли правильный ответ в сообщение
         if get_city(req) == city:
-            res['response']['buttons'] = [*STANDART_BTNS,
-                                          {'title': 'Покажи город на карте',
-                                           'hide': True,
-                                           "url": f"https://yandex.ru/maps/"
-                                                  f"?mode=search&text={city}"}]
-            res['response']['text'] = 'Правильно! Сыграем ещё?'
+            res['response']['text'] = 'Верно! А теперь угадайте в какой стране этот город?'
             sessionStorage[user_id]['guessed_cities'].append(city)
-            sessionStorage[user_id]['game_started'] = False
             return
         else:
             # если нет
             if attempt == 3:
-                # если попытка третья, то значит, что все картинки мы показали.
-                # В этом случае говорим ответ пользователю,
-                # добавляем город к sessionStorage[user_id]['guessed_cities']
-                # и отправляем его на второй круг.
-                # Обратите внимание на этот шаг на схеме.
                 res['response']['text'] = f'Вы пытались. Это {city.title()}. Сыграем ещё?'
                 sessionStorage[user_id]['game_started'] = False
                 sessionStorage[user_id]['guessed_cities'].append(city)
